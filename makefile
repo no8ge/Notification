@@ -1,8 +1,5 @@
 export GO111MODULE=on
 export GOPROXY=https://goproxy.io,direct
-export GOOS=linux
-export GOARCH=amd64
-export GOVERSION := 1.21.5
 
 
 BINARY := notify
