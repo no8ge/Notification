@@ -1,0 +1,3 @@
+registry: docker.io
+repository: no8ge
+image: notify

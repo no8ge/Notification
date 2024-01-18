@@ -1,0 +1,47 @@
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixRoute
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  http:
+    - name: "{{ .Release.Name }}"
+      match:
+        paths:
+          - /{{ .Release.Name }}/*
+        methods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - HEAD
+          - OPTIONS
+          - CONNECT
+          - TRACE
+      plugins:
+        - name: key-auth
+          enable: true
+          config:
+            key: admin
+            header: Authorization
+        - name: proxy-rewrite
+          enable: true
+          config:
+            regex_uri:
+              - /{{ .Release.Name }}/*
+              - /
+      websocket: true
+      backends:
+        - serviceName: "{{ .Release.Name }}"
+          servicePort: 8080
+
+---
+apiVersion: apisix.apache.org/v2
+kind: ApisixUpstream
+metadata:
+  name: "{{ .Release.Name }}"
+spec:
+  scheme: https
+  loadbalancer:
+    type: roundrobin

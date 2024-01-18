@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>WebSocket测试</title>
+</head>
+
+<body>
+
+  <label>  
+    WebSocket地址:
+    <input type="text" id="wsUrl" value="ws://127.0.0.1:8081/v1/ws/pull" style="width: 400px;"/>  
+  </label>
+  
+  <button onclick="connect()">连接</button>
+  <button onclick="disconnect()">断开</button>
+
+  <hr/>
+
+  <input type="text" id="messageInput"/>
+  <button onclick="sendMessage()">发送消息</button>
+
+  <hr/>
+
+  <div id="messages"></div>
+
+  <script>
+
+    var ws;
+    
+    function connect() {
+      var url = document.getElementById("wsUrl").value;
+      ws = new WebSocket(url);
+
+      ws.onopen = function() {
+        output("连接成功");
+      };
+      
+      ws.onmessage = function(evt) {
+        output("收到消息: " + evt.data);
+      };
+    }
+    
+    function disconnect() {
+      if(ws) {
+        ws.close();
+        output("连接已断开");
+      }
+    }
+    
+    function sendMessage() {
+      var msg = document.getElementById("messageInput").value;
+      ws.send(msg);
+      output("发送消息: " + msg); 
+    }
+
+    function output(text) {
+      var msg = document.createElement("div");
+      msg.innerHTML = text;
+      document.getElementById("messages").appendChild(msg);
+    }
+
+  </script>
+
+</body>
+</html>

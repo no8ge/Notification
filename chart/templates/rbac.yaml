@@ -1,0 +1,30 @@
+## rbac
+## 通过 ClusterRole 制定细分权限
+# ---
+# kind: ClusterRole
+# apiVersion: rbac.authorization.k8s.io/v1
+# metadata:
+#   name: example-role
+# rules:
+#   - apiGroups: [""]
+#     resources: ["pods"]
+#     verbs: ["list"]
+#   - apiGroups: ["batch", "extensions"]
+#     resources: ["jobs"]
+#     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: "{{ .Release.Name }}-role"
+subjects:
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  ## 默认指定管理员权限
+  ## 通过 ClusterRole 绑定细分权限, 并指定 name: example-role
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
