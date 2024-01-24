@@ -2,11 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	types "github.com/no8geo/notify/pkg"
 
 	"github.com/no8geo/notify/pkg/k8s"
 	router "github.com/no8geo/notify/router"
@@ -42,32 +43,46 @@ func main() {
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
+			var c types.Cast
 			pod := obj.(*corev1.Pod)
-			podsJson, err := json.Marshal(pod)
-			if err != nil {
-				panic(err)
-			}
-			m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
-				return s.Request.RequestURI == "/v1/ws/watch"
-			})
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			oldPod := old.(*corev1.Pod)
-			newPod := new.(*corev1.Pod)
-			if newPod.Status.Phase != oldPod.Status.Phase {
-				log.Printf("Pod %s status updated %s -> %s \n",
-					newPod.Name, oldPod.Status.Phase, newPod.Status.Phase)
-
-				diff := map[string]interface{}{
-					"name": newPod.Name,
-					"diff": fmt.Sprintf("Pod %s status updated %s to %s",
-						newPod.Name, oldPod.Status.Phase, newPod.Status.Phase),
-				}
-				diffJson, err := json.Marshal(diff)
+			l, ok := pod.GetLabels()["atop.io/managed-by"]
+			if ok && l == "core" {
+				log.Printf("Add pod %s status is %s \n", pod.Name, pod.Status.Phase)
+				c.Name = pod.Name
+				c.Namespace = pod.Namespace
+				c.Status = pod.Status
+				c.CreationTimestamp = pod.ObjectMeta.GetCreationTimestamp().Time
+				podsJson, err := json.Marshal(c)
 				if err != nil {
 					panic(err)
 				}
-				m.BroadcastFilter(diffJson, func(s *melody.Session) bool {
+				m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
+					return s.Request.RequestURI == "/v1/ws/watch"
+				})
+			}
+		},
+		UpdateFunc: func(old interface{}, new interface{}) {
+			// var cs types.Castchange
+			oldPod := old.(*corev1.Pod)
+			newPod := new.(*corev1.Pod)
+			l, ok := newPod.GetLabels()["atop.io/managed-by"]
+			if newPod.Status.Phase != oldPod.Status.Phase && ok && l == "core" {
+				log.Printf("Pod %s status updated %s -> %s \n",
+					newPod.Name, oldPod.Status.Phase, newPod.Status.Phase)
+				cs := &types.Castchange{
+					Name:              newPod.Name,
+					Namespace:         newPod.Namespace,
+					CreationTimestamp: newPod.ObjectMeta.GetCreationTimestamp().Time,
+					Changeset: types.Changeset{
+						Before: oldPod.Status,
+						After:  newPod.Status,
+					},
+				}
+				resp, err := json.Marshal(cs)
+				if err != nil {
+					panic(err)
+				}
+				m.BroadcastFilter(resp, func(s *melody.Session) bool {
 					return s.Request.RequestURI == "/v1/ws/watch"
 				})
 			}
@@ -77,17 +92,24 @@ func main() {
 			if err != nil {
 				panic(err)
 			}
-			resp := map[string]interface{}{
-				"name":   pod.Name,
-				"status": "deleted",
+			l, ok := pod.GetLabels()["atop.io/managed-by"]
+			if ok && l == "core" {
+				log.Printf("Pod %s delete \n", pod.Name)
+				resp := map[string]interface{}{
+					"name":              pod.Name,
+					"namespace":         pod.Namespace,
+					"creationTimestamp": pod.GetCreationTimestamp().Time,
+					"deletionTimestamp": pod.GetCreationTimestamp().Time,
+					"status":            "Terminating",
+				}
+				respJson, err := json.Marshal(resp)
+				if err != nil {
+					panic(err)
+				}
+				m.BroadcastFilter(respJson, func(s *melody.Session) bool {
+					return s.Request.RequestURI == "/v1/ws/watch"
+				})
 			}
-			respJson, err := json.Marshal(resp)
-			if err != nil {
-				panic(err)
-			}
-			m.BroadcastFilter(respJson, func(s *melody.Session) bool {
-				return s.Request.RequestURI == "/v1/ws/watch"
-			})
 		},
 	})
 
@@ -102,6 +124,7 @@ func main() {
 			if err != nil {
 				panic(err.Error())
 			}
+
 			podsJson, err := json.Marshal(pods)
 			if err != nil {
 				panic(err)
@@ -113,17 +136,36 @@ func main() {
 	}(ticker)
 
 	m.HandleMessage(func(s *melody.Session, msg []byte) {
-		pods, err := podInformer.Lister().List(labels.Everything())
+		var req types.Msg
+		json.Unmarshal(msg, &req)
+
+		labelSelectorMap := map[string]string{
+			"atop.io/managed-by": "core",
+		}
+		labelSelector := labels.SelectorFromSet(labels.Set(labelSelectorMap))
+
+		pods, err := podInformer.Lister().List(labelSelector)
 		if err != nil {
 			panic(err.Error())
 		}
-		podsJson, err := json.Marshal(pods)
-		if err != nil {
-			panic(err)
+
+		for _, v := range pods {
+			if v.Name == req.Name && v.Namespace == req.Namespace {
+				c := types.Cast{
+					Name:              v.Name,
+					Namespace:         v.Namespace,
+					CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+					Status:            v.Status,
+				}
+				resp, err := json.Marshal(c)
+				if err != nil {
+					panic(err)
+				}
+				m.BroadcastFilter(resp, func(s *melody.Session) bool {
+					return s.Request.RequestURI == "/v1/ws/pull"
+				})
+			}
 		}
-		m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
-			return s.Request.RequestURI == "/v1/ws/pull"
-		})
 
 	})
 	r.Run(":8081")

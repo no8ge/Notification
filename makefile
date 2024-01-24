@@ -1,5 +1,5 @@
-export GO111MODULE=on
-export GOPROXY=https://goproxy.io,direct
+GOPATH := $(shell go env GOPATH)
+export GOPATH
 
 
 BINARY := notify
