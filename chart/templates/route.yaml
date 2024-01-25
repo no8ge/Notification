@@ -34,7 +34,7 @@ spec:
       websocket: true
       backends:
         - serviceName: "{{ .Release.Name }}"
-          servicePort: 8080
+          servicePort: 8081
 
 ---
 apiVersion: apisix.apache.org/v2
