@@ -28,7 +28,7 @@ func main() {
 
 	clientset, err := k8s.Client()
 	if err != nil {
-		log.Fatalf("Error creating Kubernetes client: %v", err)
+		log.Printf("Error creating Kubernetes client: %v", err)
 	}
 
 	router.V1(r, m)
@@ -39,22 +39,24 @@ func main() {
 	factory := informers.NewSharedInformerFactory(clientset, 0)
 	podInformer := factory.Core().V1().Pods()
 	informer := podInformer.Informer()
+
 	defer runtime.HandleCrash()
 
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			var c types.Cast
 			pod := obj.(*corev1.Pod)
 			l, ok := pod.GetLabels()["atop.io/managed-by"]
 			if ok && l == "core" {
 				log.Printf("Add pod %s status is %s \n", pod.Name, pod.Status.Phase)
-				c.Name = pod.Name
-				c.Namespace = pod.Namespace
-				c.Status = pod.Status
-				c.CreationTimestamp = pod.ObjectMeta.GetCreationTimestamp().Time
+				c := types.Cast{
+					Name:              pod.Name,
+					Namespace:         pod.Namespace,
+					CreationTimestamp: pod.ObjectMeta.GetCreationTimestamp().Time,
+					Status:            pod.Status,
+				}
 				podsJson, err := json.Marshal(c)
 				if err != nil {
-					panic(err)
+					log.Printf("Error json marshal: %v", err)
 				}
 				m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
 					return s.Request.RequestURI == "/v1/ws/watch"
@@ -80,7 +82,7 @@ func main() {
 				}
 				resp, err := json.Marshal(cs)
 				if err != nil {
-					panic(err)
+					log.Printf("Error json marshal: %v", err)
 				}
 				m.BroadcastFilter(resp, func(s *melody.Session) bool {
 					return s.Request.RequestURI == "/v1/ws/watch"
@@ -89,9 +91,6 @@ func main() {
 		},
 		DeleteFunc: func(obj interface{}) {
 			pod := obj.(*corev1.Pod)
-			if err != nil {
-				panic(err)
-			}
 			l, ok := pod.GetLabels()["atop.io/managed-by"]
 			if ok && l == "core" {
 				log.Printf("Pod %s delete \n", pod.Name)
@@ -104,7 +103,7 @@ func main() {
 				}
 				respJson, err := json.Marshal(resp)
 				if err != nil {
-					panic(err)
+					log.Printf("Error json marshal: %v", err)
 				}
 				m.BroadcastFilter(respJson, func(s *melody.Session) bool {
 					return s.Request.RequestURI == "/v1/ws/watch"
@@ -122,15 +121,15 @@ func main() {
 			<-t.C
 			pods, err := podInformer.Lister().List(labels.Everything())
 			if err != nil {
-				panic(err.Error())
+				log.Printf("Error get pods list: %v", err)
 			}
 
 			podsJson, err := json.Marshal(pods)
 			if err != nil {
-				panic(err)
+				log.Printf("Error json marshal: %v", err)
 			}
 			m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
-				return s.Request.RequestURI == "/v1/ws/push"
+				return s.Request.RequestURI == "/v1/ws/monitor"
 			})
 		}
 	}(ticker)
@@ -146,7 +145,7 @@ func main() {
 
 		pods, err := podInformer.Lister().List(labelSelector)
 		if err != nil {
-			panic(err.Error())
+			log.Printf("Error get pods list: %v", err)
 		}
 
 		for _, v := range pods {
@@ -159,7 +158,7 @@ func main() {
 				}
 				resp, err := json.Marshal(c)
 				if err != nil {
-					panic(err)
+					log.Printf("Error json marshal: %v", err)
 				}
 				m.BroadcastFilter(resp, func(s *melody.Session) bool {
 					return s.Request.RequestURI == "/v1/ws/pull"
