@@ -1,18 +1,16 @@
-package tests
+package k8s
 
 import (
 	"context"
 	"fmt"
 	"testing"
 
-	k8s "github.com/no8geo/notify/pkg/k8s"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestClient(*testing.T) {
+func TestClient(t *testing.T) {
 
-	clientset, err := k8s.Client()
+	clientset, err := Client()
 	if err != nil {
 		panic(err.Error())
 	}
