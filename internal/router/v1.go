@@ -2,7 +2,7 @@ package router
 
 import (
 	"github.com/gin-gonic/gin"
-	handler "github.com/no8geo/notify/pkg/handler"
+	handler "github.com/no8geo/notify/internal/handler"
 	"github.com/olahol/melody"
 )
 
