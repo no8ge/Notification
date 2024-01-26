@@ -19,4 +19,4 @@ COPY --from=builder /src/notify /notify
 
 EXPOSE 8081
 WORKDIR /notify
-CMD ["/notify"]
+CMD ["/notify server"]
