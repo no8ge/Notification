@@ -41,7 +41,7 @@ spec:
             - "sh"
           args:
             - "-c"
-            - "./notify"
+            - "./notify server"
           ports:
             - containerPort: 8081
           imagePullPolicy: Always
