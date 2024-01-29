@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
 
-	types "github.com/no8geo/notify/pkg"
+	types "github.com/no8geo/notify/cmd/types"
 
 	router "github.com/no8geo/notify/internal/router"
 	"github.com/no8geo/notify/pkg/k8s"
@@ -125,16 +125,34 @@ func server(port string) {
 	go func(t *time.Ticker) {
 		for {
 			<-t.C
-			pods, err := podInformer.Lister().List(labels.Everything())
+			labelSelectorMap := map[string]string{
+				"atop.io/managed-by": "core",
+			}
+			labelSelector := labels.SelectorFromSet(labels.Set(labelSelectorMap))
+			pods, err := podInformer.Lister().List(labelSelector)
 			if err != nil {
 				log.Printf("Error get pods list: %v", err)
 			}
 
-			podsJson, err := json.Marshal(pods)
+			var detail []*types.Cast
+			for _, v := range pods {
+				c := types.Cast{
+					Name:              v.Name,
+					Namespace:         v.Namespace,
+					CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+					Status:            v.Status,
+				}
+				detail = append(detail, &c)
+			}
+			metrics := types.Metrics{
+				Total:  len(pods),
+				Detail: detail,
+			}
+			metricsJson, err := json.Marshal(metrics)
 			if err != nil {
 				log.Printf("Error json marshal: %v", err)
 			}
-			m.BroadcastFilter(podsJson, func(s *melody.Session) bool {
+			m.BroadcastFilter(metricsJson, func(s *melody.Session) bool {
 				return s.Request.RequestURI == "/v1/ws/monitor"
 			})
 		}
