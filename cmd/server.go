@@ -83,8 +83,8 @@ func server(port string) {
 					Namespace:         newPod.Namespace,
 					CreationTimestamp: newPod.ObjectMeta.GetCreationTimestamp().Time,
 					Changeset: types.Changeset{
-						Before: oldPod.Status,
-						After:  newPod.Status,
+						Before: oldPod.Status.Phase,
+						After:  newPod.Status.Phase,
 					},
 				}
 				resp, err := json.Marshal(cs)
@@ -101,12 +101,13 @@ func server(port string) {
 			l, ok := pod.GetLabels()["atop.io/managed-by"]
 			if ok && l == "core" {
 				log.Printf("Pod %s delete \n", pod.Name)
-				resp := map[string]interface{}{
-					"name":              pod.Name,
-					"namespace":         pod.Namespace,
-					"creationTimestamp": pod.GetCreationTimestamp().Time,
-					"deletionTimestamp": pod.GetCreationTimestamp().Time,
-					"status":            "Terminating",
+				resp := &types.Cast{
+					Name:              pod.Name,
+					Namespace:         pod.Namespace,
+					CreationTimestamp: pod.ObjectMeta.GetCreationTimestamp().Time,
+					Phase:             pod.Status.Phase,
+					Status:            pod.Status,
+					DeletionTimestamp: pod.GetObjectMeta().GetDeletionTimestamp().Time,
 				}
 				respJson, err := json.Marshal(resp)
 				if err != nil {
@@ -135,26 +136,72 @@ func server(port string) {
 				log.Printf("Error get pods list: %v", err)
 			}
 
-			var detail []*types.Cast
+			var failed []*types.Cast
+			var running []*types.Cast
+			var unknown []*types.Cast
+			var pending []*types.Cast
+			var succeeded []*types.Cast
 			for _, v := range pods {
-				c := types.Cast{
-					Name:              v.Name,
-					Namespace:         v.Namespace,
-					CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
-					Status:            v.Status,
+				if v.Status.Phase == corev1.PodRunning {
+					running = append(running, &types.Cast{
+						Name:              v.Name,
+						Namespace:         v.Namespace,
+						CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+						Status:            v.Status,
+						Phase:             v.Status.Phase,
+					})
 				}
-				detail = append(detail, &c)
+				if v.Status.Phase == corev1.PodSucceeded {
+					succeeded = append(succeeded, &types.Cast{
+						Name:              v.Name,
+						Namespace:         v.Namespace,
+						CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+						Status:            v.Status,
+						Phase:             v.Status.Phase,
+					})
+				}
+				if v.Status.Phase == corev1.PodFailed {
+					failed = append(failed, &types.Cast{
+						Name:              v.Name,
+						Namespace:         v.Namespace,
+						CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+						Status:            v.Status,
+						Phase:             v.Status.Phase,
+					})
+				}
+				if v.Status.Phase == corev1.PodUnknown {
+					unknown = append(unknown, &types.Cast{
+						Name:              v.Name,
+						Namespace:         v.Namespace,
+						CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+						Status:            v.Status,
+						Phase:             v.Status.Phase,
+					})
+				}
+				if v.Status.Phase == corev1.PodPending {
+					pending = append(pending, &types.Cast{
+						Name:              v.Name,
+						Namespace:         v.Namespace,
+						CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
+						Status:            v.Status,
+						Phase:             v.Status.Phase,
+					})
+				}
 			}
 			metrics := types.Metrics{
-				Total:  len(pods),
-				Detail: detail,
+				Total:     len(pods),
+				Running:   len(running),
+				Succeeded: len(succeeded),
+				Failed:    len(failed),
+				Unknown:   len(unknown),
+				Pending:   len(pending),
 			}
 			metricsJson, err := json.Marshal(metrics)
 			if err != nil {
 				log.Printf("Error json marshal: %v", err)
 			}
 			m.BroadcastFilter(metricsJson, func(s *melody.Session) bool {
-				return s.Request.RequestURI == "/v1/ws/monitor"
+				return s.Request.RequestURI == "/v1/ws/metrics"
 			})
 		}
 	}(ticker)
@@ -180,8 +227,18 @@ func server(port string) {
 					Namespace:         v.Namespace,
 					CreationTimestamp: v.ObjectMeta.GetCreationTimestamp().Time,
 					Status:            v.Status,
+					Phase:             v.Status.Phase,
 				}
 				resp, err := json.Marshal(c)
+				if err != nil {
+					log.Printf("Error json marshal: %v", err)
+				}
+				m.BroadcastFilter(resp, func(s *melody.Session) bool {
+					return s.Request.RequestURI == "/v1/ws/pull"
+				})
+			}
+			if req.Name == "" && req.Namespace == "" {
+				resp, err := json.Marshal(pods)
 				if err != nil {
 					log.Printf("Error json marshal: %v", err)
 				}
