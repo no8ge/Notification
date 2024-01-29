@@ -16,7 +16,7 @@ func V1(r *gin.Engine, m *melody.Melody) {
 	webSocket := r.Group("v1")
 	{
 		webSocket.GET("/ws/pull", handler.Pull(m))
-		webSocket.GET("/ws/monitor", handler.Monitor(m))
+		webSocket.GET("/ws/metrics", handler.Metrics(m))
 		webSocket.GET("/ws/watch", handler.Watch(m))
 	}
 }

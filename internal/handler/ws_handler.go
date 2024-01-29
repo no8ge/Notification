@@ -17,7 +17,7 @@ func Pull(m *melody.Melody) gin.HandlerFunc {
 	}
 }
 
-func Monitor(m *melody.Melody) gin.HandlerFunc {
+func Metrics(m *melody.Melody) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		m.HandleRequest(c.Writer, c.Request)
 	}
