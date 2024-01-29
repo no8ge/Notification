@@ -2,13 +2,11 @@ package util
 
 import (
 	"testing"
-
-	types "github.com/no8geo/notify/pkg"
 )
 
 func TestWechatSendMarkdown(t *testing.T) {
 
-	data := &types.MarkdownMsg{
+	data := &MarkdownMsg{
 		Msgtype: "markdown",
 		Markdown: map[string]string{
 			"content": "123",
