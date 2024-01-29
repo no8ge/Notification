@@ -11,13 +11,14 @@ metadata:
     atop.io/report-path: /demo/report
     atop.io/protocol: s3
 spec:
+  restartPolicy: Never
   containers:
     - name: pytest
       image: no8ge/demo:1.0.0
       args:
         - /bin/sh
         - -c
-        - pytest --html=report/report.html -s -v;sleep 60
+        - pytest --html=report/report.html -s -v;sleep infinity
       ports:
         - containerPort: 8002
       env:
