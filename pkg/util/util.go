@@ -8,18 +8,15 @@ import (
 
 	"net/http"
 	"net/url"
+
+	types "github.com/no8geo/notify/pkg"
 )
 
 type WeChat struct {
 	Key string `json:"key"`
 }
 
-type MarkdownMsg struct {
-	Msgtype  string            `json:"msgtype"`
-	Markdown map[string]string `json:"markdown"`
-}
-
-func (w *WeChat) SendMarkdown(m *MarkdownMsg) error {
+func (w *WeChat) SendMarkdown(m *types.MarkdownMsg) error {
 
 	params := url.Values{}
 	Url, err := url.Parse("https://qyapi.weixin.qq.com/cgi-bin/webhook/send")
